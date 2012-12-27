@@ -14,6 +14,7 @@
   var defaults = {
       'version'              : '2.0.1',
       'tipLocation'          : 'bottom',  // 'top' or 'bottom' in relation to parent
+      'tipAlign'             : 'auto',    // 'left', 'right' for top/bottom tip locaiton, 'top', 'bottom' for left/right tip location. only works in desktop browser
       'nubPosition'          : 'auto',    // override on a per tooltip bases
       'scrollSpeed'          : 300,       // Page scrolling speed in milliseconds
       'timer'                : 0,         // 0 = no timer , all other numbers = timer in milliseconds
@@ -36,7 +37,8 @@
         'wrapper' : '<div class="joyride-content-wrapper"></div>',
         'button'  : '<a href="#" class="joyride-next-tip"></a>'
       },
-      'expose': false                   // set to 'auto' to expose the target element by default, unless specified otherwise in data-options
+      'expose': false,                   // Set to 'auto' to expose the target element by default, unless specified otherwise in data-options
+      'exposeClass': ''                 // Custom expose class in addition to joyride-9999
     },
 
     Modernizr = Modernizr || false,
@@ -419,6 +421,41 @@
         methods.show('init');
       },
 
+      get_tip_align: function () {
+        var align = settings.tipSettings.tipAlign;
+        var target = settings.$target;
+        var to = target.offset();
+        var tip = settings.$next_tip;
+        var w = $('body');
+        if (align == 'auto') {
+          if (methods.bottom() || methods.top()) {
+            align = (to.left + tip.outerWidth()) < w.width() ? 'left' : 'right';
+          } else {
+            align = (to.top + tip.outerHeight()) < w.height() ? 'top' : 'bottom';
+          }
+        }
+        return align;
+      },
+
+      get_aligned_offset: function (align, default_offset) {
+        var align = methods.get_tip_align();
+        var target = settings.$target;
+        var to = target.offset();
+        var tip = settings.$next_tip;
+
+        if (!default_offset) default_offset = {left:0, top:0};
+        var ret = default_offset;
+        if (align == 'left')
+          ret.left = to.left;
+        else if (align == 'right')
+          ret.left = to.left + target.outerWidth() - tip.outerWidth();
+        else if (align == 'top')
+          ret.top = to.top;
+        else if (align == 'bottom')
+          ret.top = to.top + target.outerHeight() - tip.outerHeight();
+        return ret;
+      },
+
       pos_default : function (init) {
         var half_fold = Math.ceil(settings.$window.height() / 2),
             tip_position = settings.$next_tip.offset(),
@@ -433,39 +470,41 @@
         }
 
         if (!/body/i.test(settings.$target.selector)) {
-
+            var tip_align = methods.get_tip_align();
             if (methods.bottom()) {
-              settings.$next_tip.css({
+              settings.$next_tip.css(methods.get_aligned_offset(tip_align, {
                 top: (settings.$target.offset().top + nub_height + settings.$target.outerHeight()),
-                left: settings.$target.offset().left});
+                left: 0}));
 
               methods.nub_position($nub, settings.tipSettings.nubPosition, 'top');
 
             } else if (methods.top()) {
 
-              settings.$next_tip.css({
+              settings.$next_tip.css(methods.get_aligned_offset(tip_align, {
                 top: (settings.$target.offset().top - settings.$next_tip.outerHeight() - nub_height),
-                left: settings.$target.offset().left});
+                left: 0}));
 
               methods.nub_position($nub, settings.tipSettings.nubPosition, 'bottom');
 
             } else if (methods.right()) {
 
-              settings.$next_tip.css({
-                top: settings.$target.offset().top,
-                left: (settings.$target.outerWidth() + settings.$target.offset().left)});
+              settings.$next_tip.css(methods.get_aligned_offset(tip_align, {
+                top: 0,
+                left: (settings.$target.outerWidth() + settings.$target.offset().left)}));
 
               methods.nub_position($nub, settings.tipSettings.nubPosition, 'left');
 
             } else if (methods.left()) {
 
-              settings.$next_tip.css({
-                top: settings.$target.offset().top,
-                left: (settings.$target.offset().left - settings.$next_tip.outerWidth() - nub_height)});
+              settings.$next_tip.css(methods.get_aligned_offset(tip_align, {
+                top: 0,
+                left: (settings.$target.offset().left - settings.$next_tip.outerWidth() - nub_height)}));
 
               methods.nub_position($nub, settings.tipSettings.nubPosition, 'right');
 
             }
+
+            methods.adapt_auto_nub_position($nub, tip_align);
 
             if (!methods.visible(methods.corners(settings.$next_tip)) && settings.attempts < settings.tipSettings.tipLocationPattern.length) {
 
@@ -609,6 +648,15 @@
           nub.addClass(def);
         } else {
           nub.addClass(pos);
+        }
+      },
+
+      adapt_auto_nub_position: function (nub, align) {
+        var t = settings.$next_tip;
+        if (align == 'right') {
+          nub.css({right: nub.css('left'), left:'auto'});
+        } else if (align == 'bottom') {
+          nub.css({bottom: nub.css('top'), top:'auto'});
         }
       },
 
